@@ -41,7 +41,7 @@
     <div id="main-page" class="max-w-6xl mx-auto hidden">
         <header class="mb-10 flex flex-col md:flex-row justify-between items-center gap-4">
             <div>
-                <h1 class="text-4xl font-black text-emerald-400 italic tracking-tighter">PORTAL <span class="text-white uppercase" id="display-nama">GURU</span></h1>
+                <h1 class="text-4xl font-black text-emerald-400 italic tracking-tighter">HELLO, <span class="text-white" id="display-nama">Guru</span></h1>
                 <p class="text-slate-500 text-xs font-bold tracking-[0.2em] uppercase mt-1">Sistem Rekapitulasi Pembimbingan</p>
             </div>
             <button onclick="logout()" class="text-[10px] font-bold bg-red-900/30 text-red-400 px-4 py-2 rounded-lg border border-red-800 hover:bg-red-800 hover:text-white transition-all">LOGOUT</button>
@@ -69,7 +69,7 @@
                         <textarea name="TindakLanjut" class="input-box h-28 md:col-span-2" placeholder="Tindak Lanjut..."></textarea>
                         <input type="text" name="Alamat" class="input-box md:col-span-2" placeholder="Alamat">
                         <input type="text" name="OrangTua" class="input-box" placeholder="Nama Orang Tua">
-                        <input type="text" name="Telepon" class="input-box" placeholder="No. WhatsApp (Contoh: 0812...)">
+                        <input type="text" name="Telepon" class="input-box" placeholder="No. WhatsApp">
                         <input type="text" name="Pekerjaan" class="input-box md:col-span-2" placeholder="Pekerjaan">
                         <button type="submit" class="md:col-span-2 bg-emerald-600 hover:bg-emerald-500 py-4 rounded-xl font-black text-xs uppercase text-white shadow-lg transition-all">Simpan Laporan</button>
                     </form>
@@ -93,42 +93,32 @@
     </div>
 
     <script>
-        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyG-JMBD11kWcR8Mnz1r2j1Twe9WfjZFzsIGW0MwC4Y9EoB0zVe-OOkV6ydXHLTFWNI/exec"; 
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyXY79iajCNw1fotTExGJtrfJIP_Nx3mCtoP9hzP3gPpiRdThGjrcSGDUN-nSn6u1MS/exec"; 
         let currentTab = 'guru-wali';
         let currentAction = 'input';
 
-        // --- FUNGSI LOGIN ---
         async function handleLogin(e) {
             e.preventDefault();
             toggleLoader(true);
             const user = document.getElementById('username').value;
             const pass = document.getElementById('password').value;
-
             try {
-                const res = await fetch(`${WEB_APP_URL}?action=login&user=${user}&pass=${pass}`);
+                const res = await fetch(`${WEB_APP_URL}?action=login&user=${encodeURIComponent(user)}&pass=${encodeURIComponent(pass)}`);
                 const result = await res.json();
-                
                 if (result.status === "success") {
                     document.getElementById('login-page').classList.add('hidden');
                     document.getElementById('main-page').classList.remove('hidden');
+                    // Menampilkan nama sesuai database (Tanpa dipaksa Uppercase)
                     document.getElementById('display-nama').innerText = result.nama;
                     sessionStorage.setItem('isLoggedIn', 'true');
                     sessionStorage.setItem('namaUser', result.nama);
-                } else {
-                    alert("⚠️ Username atau Password salah!");
-                }
-            } catch (err) {
-                alert("❌ Gagal terhubung ke server.");
-            }
+                } else { alert("⚠️ Username atau Password salah!"); }
+            } catch (err) { alert("❌ Gagal terhubung ke server."); }
             toggleLoader(false);
         }
 
-        function logout() {
-            sessionStorage.clear();
-            location.reload();
-        }
+        function logout() { sessionStorage.clear(); location.reload(); }
 
-        // Cek Session saat refresh
         window.onload = () => {
             if(sessionStorage.getItem('isLoggedIn') === 'true') {
                 document.getElementById('login-page').classList.add('hidden');
@@ -137,7 +127,6 @@
             }
         }
 
-        // --- FUNGSI NAVIGASI & DATA ---
         function switchTab(t) {
             currentTab = t;
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -162,14 +151,17 @@
             if(currentAction === 'lihat') fetchData();
         }
 
-        async function handleSimpan(e, sName) {
-            e.preventDefault();
+        async function handleSimpan(event, sName) {
+            event.preventDefault();
             toggleLoader(true);
-            const data = Object.fromEntries(new FormData(e.target).entries());
+            const data = Object.fromEntries(new FormData(event.target).entries());
             try {
-                await fetch(WEB_APP_URL, { method: 'POST', mode: 'no-cors', body: new URLSearchParams({ action: 'save', sheet: sName, data: JSON.stringify(data) }) });
+                await fetch(WEB_APP_URL, { 
+                    method: 'POST', mode: 'no-cors', 
+                    body: new URLSearchParams({ action: 'save', sheet: sName, data: JSON.stringify(data) }) 
+                });
                 alert("✅ Data Berhasil Disimpan!");
-                e.target.reset();
+                event.target.reset();
             } catch (err) { alert("❌ Gagal Simpan."); }
             toggleLoader(false);
         }
@@ -178,23 +170,34 @@
             const sName = (currentTab === 'guru-wali') ? 'GuruWali' : (currentTab === 'wali-kelas') ? 'WaliKelas' : 'GuruMapel';
             const tbody = document.querySelector(`#table-${sName} .data-body`);
             tbody.innerHTML = '<tr><td colspan="12" class="text-center py-10 opacity-50 italic">Mengambil data...</td></tr>';
-            
             try {
                 const res = await fetch(`${WEB_APP_URL}?action=read&sheet=${sName}`);
                 const result = await res.json();
-                tbody.innerHTML = result.data.map(row => {
-                    const nis = row[1] || row[2];
-                    return `<tr>${row.map(v => `<td>${v}</td>`).join('')}<td><button onclick="handleDelete('${sName}','${nis}')" class="text-red-500 font-bold">HAPUS</button></td></tr>`;
+                tbody.innerHTML = result.data.map((row, index) => {
+                    const rowNumber = index + 2; 
+                    return `<tr>
+                        ${row.map((v, i) => {
+                            let val = String(v).startsWith("'") ? String(v).substring(1) : v;
+                            // HILANGKAN JAM: Hanya ambil YYYY-MM-DD
+                            if (i === 0 && val.includes('T')) { val = val.split('T')[0]; }
+                            return `<td>${val}</td>`;
+                        }).join('')}
+                        <td><button onclick="handleDelete('${sName}', ${rowNumber})" class="text-red-500 font-bold hover:text-white">HAPUS</button></td>
+                    </tr>`;
                 }).join('');
             } catch (e) { tbody.innerHTML = '<tr><td colspan="12" class="text-center text-red-400">Gagal memuat data.</td></tr>'; }
         }
 
-        async function handleDelete(s, n) {
-            if(!confirm(`Hapus NIS ${n}?`)) return;
+        async function handleDelete(s, row) {
+            if(!confirm(`Hapus data baris ke-${row-1}?`)) return;
             toggleLoader(true);
-            await fetch(WEB_APP_URL, { method: 'POST', mode: 'no-cors', body: new URLSearchParams({ action: 'delete', sheet: s, nis: n }) });
-            fetchData();
-            toggleLoader(false);
+            try {
+                await fetch(WEB_APP_URL, { 
+                    method: 'POST', mode: 'no-cors', 
+                    body: new URLSearchParams({ action: 'delete', sheet: s, row: row }) 
+                });
+                setTimeout(() => { fetchData(); toggleLoader(false); }, 1500);
+            } catch (e) { alert("Gagal menghapus."); toggleLoader(false); }
         }
 
         function exportToExcel() {
@@ -204,18 +207,23 @@
             
             const excelData = rows.map(row => {
                 const cells = Array.from(row.querySelectorAll('th, td'));
-                cells.pop(); 
-                return cells.map((cell, idx) => {
-                    let val = cell.innerText.trim();
-                    // FIX ANGKA 0:
-                    if (sName === "GuruWali" && idx === 7 && val.startsWith('0')) {
-                        return "\u200B" + val;
-                    }
-                    return val;
-                });
+                cells.pop();
+                return cells.map(cell => cell.innerText.trim());
             });
 
             const ws = XLSX.utils.aoa_to_sheet(excelData);
+
+            if (sName === "GuruWali") {
+                const range = XLSX.utils.decode_range(ws['!ref']);
+                for (let R = 1; R <= range.e.r; ++R) {
+                    const cellAddress = XLSX.utils.encode_cell({r: R, c: 7});
+                    if (ws[cellAddress]) {
+                        ws[cellAddress].t = 's';
+                        ws[cellAddress].z = '@';
+                    }
+                }
+            }
+
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, sName);
             XLSX.writeFile(wb, `Data_${sName}.xlsx`);
