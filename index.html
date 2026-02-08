@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <title>Siswa Monitor Pro</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { background-color: #0f172a; color: #f8fafc; font-family: 'Inter', sans-serif; overflow-x: hidden; }
+        .input-box { background-color: #1e293b; border: 1px solid #334155; border-radius: 0.5rem; padding: 0.75rem; width: 100%; color: #f8fafc; outline: none; transition: 0.2s; }
+        .input-box:focus { border-color: #10b981; }
+        .nav-btn.active { background-color: #10b981; color: white; }
+        .sub-btn.active { border-color: #10b981; color: #10b981; background: rgba(16, 185, 129, 0.1); }
+        .loader { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.9); z-index: 100; justify-content: center; align-items: center; flex-direction: column; gap: 10px; }
+        th { background: #1e293b; padding: 12px; font-size: 0.75rem; color: #94a3b8; text-align: left; border-bottom: 2px solid #334155; }
+        td { padding: 12px; border-bottom: 1px solid #334155; font-size: 0.85rem; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div id="loader" class="loader">
+        <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-400"></div>
+        <span class="font-black text-emerald-400 text-sm italic tracking-widest uppercase">Memproses Data...</span>
+    </div>
+
+    <div id="login-page" class="min-h-screen flex items-center justify-center">
+        <div class="bg-slate-900 p-8 rounded-2xl border border-slate-800 w-full max-w-md shadow-2xl">
+            <h1 class="text-3xl font-black text-emerald-400 italic mb-2">LOGIN <span class="text-white">PORTAL</span></h1>
+            <p class="text-slate-500 text-xs font-bold uppercase mb-8 tracking-widest">Siswa Monitor System</p>
+            <form onsubmit="handleLogin(event)" class="space-y-4">
+                <input type="text" id="username" class="input-box" placeholder="Username" required>
+                <input type="password" id="password" class="input-box" placeholder="Password" required>
+                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 py-3 rounded-xl font-black text-xs uppercase text-white transition-all mt-4">Masuk</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="main-page" class="max-w-6xl mx-auto hidden">
+        <header class="mb-10 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div>
+                <h1 class="text-4xl font-black text-emerald-400 italic tracking-tighter">PORTAL <span class="text-white uppercase" id="display-nama">GURU</span></h1>
+                <p class="text-slate-500 text-xs font-bold tracking-[0.2em] uppercase mt-1">Sistem Rekapitulasi Pembimbingan</p>
+            </div>
+            <button onclick="logout()" class="text-[10px] font-bold bg-red-900/30 text-red-400 px-4 py-2 rounded-lg border border-red-800 hover:bg-red-800 hover:text-white transition-all">LOGOUT</button>
+        </header>
+
+        <div class="flex flex-wrap gap-2 mb-8">
+            <button id="tab-guru-wali" onclick="switchTab('guru-wali')" class="nav-btn active px-8 py-3 rounded-xl font-black text-[10px] bg-slate-800 tracking-widest">GURU WALI</button>
+            <button id="tab-wali-kelas" onclick="switchTab('wali-kelas')" class="nav-btn px-8 py-3 rounded-xl font-black text-[10px] bg-slate-800 tracking-widest">WALI KELAS</button>
+            <button id="tab-guru-mapel" onclick="switchTab('guru-mapel')" class="nav-btn px-8 py-3 rounded-xl font-black text-[10px] bg-slate-800 tracking-widest">GURU MAPEL</button>
+        </div>
+
+        <div class="flex gap-4 mb-6 border-b border-slate-800 pb-4">
+            <button id="sub-input" onclick="switchAction('input')" class="sub-btn active border border-slate-700 px-6 py-2 rounded-lg text-[10px] font-black uppercase">✏️ Form Input</button>
+            <button id="sub-lihat" onclick="switchAction('lihat')" class="sub-btn border border-slate-700 px-6 py-2 rounded-lg text-[10px] font-black uppercase">👁️ Lihat Database</button>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 md:p-8 shadow-2xl">
+            <div id="sec-guru-wali" class="section">
+                <div id="input-guru-wali">
+                    <form onsubmit="handleSimpan(event, 'GuruWali')" class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div class="md:col-span-2"><label class="text-[10px] text-slate-500 font-bold uppercase mb-2 block">Tanggal Kejadian</label><input type="date" name="Tanggal" class="input-box" required></div>
+                        <input type="text" name="NIS" class="input-box" placeholder="NIS Siswa" required>
+                        <input type="text" name="Nama" class="input-box" placeholder="Nama Lengkap Siswa" required>
+                        <textarea name="Catatan" class="input-box h-28 md:col-span-2" placeholder="Detail Masalah..."></textarea>
+                        <textarea name="TindakLanjut" class="input-box h-28 md:col-span-2" placeholder="Tindak Lanjut..."></textarea>
+                        <input type="text" name="Alamat" class="input-box md:col-span-2" placeholder="Alamat">
+                        <input type="text" name="OrangTua" class="input-box" placeholder="Nama Orang Tua">
+                        <input type="text" name="Telepon" class="input-box" placeholder="No. WhatsApp (Contoh: 0812...)">
+                        <input type="text" name="Pekerjaan" class="input-box md:col-span-2" placeholder="Pekerjaan">
+                        <button type="submit" class="md:col-span-2 bg-emerald-600 hover:bg-emerald-500 py-4 rounded-xl font-black text-xs uppercase text-white shadow-lg transition-all">Simpan Laporan</button>
+                    </form>
+                </div>
+                <div id="lihat-guru-wali" class="hidden">
+                    <button onclick="exportToExcel()" class="mb-4 bg-blue-600 text-white px-6 py-2 rounded-lg font-black text-[10px] uppercase">📥 Download Excel</button>
+                    <div class="overflow-x-auto"><table id="table-GuruWali"><thead><tr><th>Tgl</th><th>NIS</th><th>Nama</th><th>Masalah</th><th>Solusi</th><th>Alamat</th><th>Ortu</th><th>Telepon</th><th>Pekerjaan</th><th>Aksi</th></tr></thead><tbody class="data-body"></tbody></table></div>
+                </div>
+            </div>
+
+            <div id="sec-wali-kelas" class="section hidden">
+                <div id="input-wali-kelas"><form onsubmit="handleSimpan(event, 'WaliKelas')" class="space-y-4"><input type="date" name="Tanggal" class="input-box" required><input type="text" name="Kelas" class="input-box" placeholder="Kelas"><input type="text" name="NIS" class="input-box" placeholder="NIS"><input type="text" name="Nama" class="input-box" placeholder="Nama Siswa"><textarea name="Catatan" class="input-box h-24" placeholder="Masalah"></textarea><textarea name="TindakLanjut" class="input-box h-24" placeholder="Tindak Lanjut"></textarea><button type="submit" class="w-full bg-emerald-600 py-4 rounded-xl font-black text-xs uppercase">Simpan</button></form></div>
+                <div id="lihat-wali-kelas" class="hidden"><button onclick="exportToExcel()" class="mb-4 bg-blue-600 px-6 py-2 rounded-lg font-black text-[10px]">📥 Download</button><div class="overflow-x-auto"><table id="table-WaliKelas"><thead><tr><th>Tgl</th><th>Kelas</th><th>NIS</th><th>Nama</th><th>Catatan</th><th>Tindak Lanjut</th><th>Aksi</th></tr></thead><tbody class="data-body"></tbody></table></div></div>
+            </div>
+
+            <div id="sec-guru-mapel" class="section hidden">
+                <div id="input-guru-mapel"><form onsubmit="handleSimpan(event, 'GuruMapel')" class="space-y-4"><input type="date" name="Tanggal" class="input-box" required><input type="text" name="Kelas" class="input-box" placeholder="Kelas"><input type="text" name="Mapel" class="input-box" placeholder="Mapel"><input type="text" name="NIS" class="input-box" placeholder="NIS"><input type="text" name="Nama" class="input-box" placeholder="Nama Siswa"><textarea name="Catatan" class="input-box h-24" placeholder="Masalah"></textarea><textarea name="TindakLanjut" class="input-box h-24" placeholder="Tindak Lanjut"></textarea><button type="submit" class="w-full bg-emerald-600 py-4 rounded-xl font-black text-xs uppercase">Simpan</button></form></div>
+                <div id="lihat-guru-mapel" class="hidden"><button onclick="exportToExcel()" class="mb-4 bg-blue-600 px-6 py-2 rounded-lg font-black text-[10px]">📥 Download</button><div class="overflow-x-auto"><table id="table-GuruMapel"><thead><tr><th>Tgl</th><th>Kelas</th><th>Mapel</th><th>NIS</th><th>Nama</th><th>Catatan</th><th>Tindak Lanjut</th><th>Aksi</th></tr></thead><tbody class="data-body"></tbody></table></div></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyG-JMBD11kWcR8Mnz1r2j1Twe9WfjZFzsIGW0MwC4Y9EoB0zVe-OOkV6ydXHLTFWNI/exec"; 
+        let currentTab = 'guru-wali';
+        let currentAction = 'input';
+
+        // --- FUNGSI LOGIN ---
+        async function handleLogin(e) {
+            e.preventDefault();
+            toggleLoader(true);
+            const user = document.getElementById('username').value;
+            const pass = document.getElementById('password').value;
+
+            try {
+                const res = await fetch(`${WEB_APP_URL}?action=login&user=${user}&pass=${pass}`);
+                const result = await res.json();
+                
+                if (result.status === "success") {
+                    document.getElementById('login-page').classList.add('hidden');
+                    document.getElementById('main-page').classList.remove('hidden');
+                    document.getElementById('display-nama').innerText = result.nama;
+                    sessionStorage.setItem('isLoggedIn', 'true');
+                    sessionStorage.setItem('namaUser', result.nama);
+                } else {
+                    alert("⚠️ Username atau Password salah!");
+                }
+            } catch (err) {
+                alert("❌ Gagal terhubung ke server.");
+            }
+            toggleLoader(false);
+        }
+
+        function logout() {
+            sessionStorage.clear();
+            location.reload();
+        }
+
+        // Cek Session saat refresh
+        window.onload = () => {
+            if(sessionStorage.getItem('isLoggedIn') === 'true') {
+                document.getElementById('login-page').classList.add('hidden');
+                document.getElementById('main-page').classList.remove('hidden');
+                document.getElementById('display-nama').innerText = sessionStorage.getItem('namaUser');
+            }
+        }
+
+        // --- FUNGSI NAVIGASI & DATA ---
+        function switchTab(t) {
+            currentTab = t;
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('tab-'+t).classList.add('active');
+            renderUI();
+        }
+
+        function switchAction(a) {
+            currentAction = a;
+            document.querySelectorAll('.sub-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('sub-'+a).classList.add('active');
+            renderUI();
+        }
+
+        function renderUI() {
+            document.querySelectorAll('.section').forEach(s => s.classList.add('hidden'));
+            const activeSec = document.getElementById('sec-'+currentTab);
+            activeSec.classList.remove('hidden');
+            activeSec.querySelector('#input-'+currentTab).classList.add('hidden');
+            activeSec.querySelector('#lihat-'+currentTab).classList.add('hidden');
+            document.getElementById(currentAction+'-'+currentTab).classList.remove('hidden');
+            if(currentAction === 'lihat') fetchData();
+        }
+
+        async function handleSimpan(e, sName) {
+            e.preventDefault();
+            toggleLoader(true);
+            const data = Object.fromEntries(new FormData(e.target).entries());
+            try {
+                await fetch(WEB_APP_URL, { method: 'POST', mode: 'no-cors', body: new URLSearchParams({ action: 'save', sheet: sName, data: JSON.stringify(data) }) });
+                alert("✅ Data Berhasil Disimpan!");
+                e.target.reset();
+            } catch (err) { alert("❌ Gagal Simpan."); }
+            toggleLoader(false);
+        }
+
+        async function fetchData() {
+            const sName = (currentTab === 'guru-wali') ? 'GuruWali' : (currentTab === 'wali-kelas') ? 'WaliKelas' : 'GuruMapel';
+            const tbody = document.querySelector(`#table-${sName} .data-body`);
+            tbody.innerHTML = '<tr><td colspan="12" class="text-center py-10 opacity-50 italic">Mengambil data...</td></tr>';
+            
+            try {
+                const res = await fetch(`${WEB_APP_URL}?action=read&sheet=${sName}`);
+                const result = await res.json();
+                tbody.innerHTML = result.data.map(row => {
+                    const nis = row[1] || row[2];
+                    return `<tr>${row.map(v => `<td>${v}</td>`).join('')}<td><button onclick="handleDelete('${sName}','${nis}')" class="text-red-500 font-bold">HAPUS</button></td></tr>`;
+                }).join('');
+            } catch (e) { tbody.innerHTML = '<tr><td colspan="12" class="text-center text-red-400">Gagal memuat data.</td></tr>'; }
+        }
+
+        async function handleDelete(s, n) {
+            if(!confirm(`Hapus NIS ${n}?`)) return;
+            toggleLoader(true);
+            await fetch(WEB_APP_URL, { method: 'POST', mode: 'no-cors', body: new URLSearchParams({ action: 'delete', sheet: s, nis: n }) });
+            fetchData();
+            toggleLoader(false);
+        }
+
+        function exportToExcel() {
+            const sName = (currentTab === 'guru-wali') ? 'GuruWali' : (currentTab === 'wali-kelas') ? 'WaliKelas' : 'GuruMapel';
+            const table = document.getElementById(`table-${sName}`);
+            const rows = Array.from(table.querySelectorAll('tr'));
+            
+            const excelData = rows.map(row => {
+                const cells = Array.from(row.querySelectorAll('th, td'));
+                cells.pop(); 
+                return cells.map((cell, idx) => {
+                    let val = cell.innerText.trim();
+                    // FIX ANGKA 0:
+                    if (sName === "GuruWali" && idx === 7 && val.startsWith('0')) {
+                        return "\u200B" + val;
+                    }
+                    return val;
+                });
+            });
+
+            const ws = XLSX.utils.aoa_to_sheet(excelData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, sName);
+            XLSX.writeFile(wb, `Data_${sName}.xlsx`);
+        }
+
+        function toggleLoader(s) { document.getElementById('loader').style.display = s ? 'flex' : 'none'; }
+    </script>
+</body>
+</html>
